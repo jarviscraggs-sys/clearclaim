@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/startup.js && next start -p ${PORT:-3000}",
     "lint": "next lint",
     "seed": "npx tsx scripts/seed.ts"
   },
