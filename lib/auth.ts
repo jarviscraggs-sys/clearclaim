@@ -62,6 +62,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   pages: {
     signIn: '/login',
+    signOut: '/login',
+    error: '/login',
   },
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'clearclaim-dev-secret',
   session: { strategy: 'jwt' },
