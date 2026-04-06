@@ -94,7 +94,7 @@ export default function EmployeeNav({ user }: { user?: any }) {
             </div>
           </div>
           <button
-            onClick={() => signOut({ callbackUrl: '/login' })}
+            onClick={() => signOut({ callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || ''}/login` })}
             className="w-full text-xs text-emerald-400 hover:text-white py-2 px-3 rounded-lg hover:bg-red-900/20 transition text-left"
           >
             Sign out →
