@@ -1,8 +1,11 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "python3", "gnumake", "gcc"]
+nixPkgs = ["nodejs_20", "python3", "gnumake", "gcc", "sqlite"]
 
 [phases.install]
-cmds = ["npm install --legacy-peer-deps --no-audit --no-fund"]
+cmds = [
+  "npm install --legacy-peer-deps --no-audit --no-fund",
+  "npm rebuild better-sqlite3 --build-from-source"
+]
 
 [phases.build]
 cmds = ["npm run build"]
