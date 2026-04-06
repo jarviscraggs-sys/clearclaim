@@ -5,13 +5,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "node scripts/startup.js && next start",
+    "lint": "next lint",
+    "seed": "npx tsx scripts/seed.ts"
   },
   "engines": {
-    "node": ">=18.0.0",
-    "start": "next start",
-    "seed": "npx tsx scripts/seed.ts"
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
