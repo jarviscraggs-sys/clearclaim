@@ -306,5 +306,9 @@ try {
   console.log('[ClearClaim] Startup complete.');
 } catch (e) {
   console.error('[ClearClaim] Startup error:', e.message);
+  console.error('[ClearClaim] Stack:', e.stack);
+  console.error('[ClearClaim] Node version:', process.version);
+  console.error('[ClearClaim] Platform:', process.platform, process.arch);
+  console.error('[ClearClaim] CWD:', process.cwd());
   // Don't exit — let Next.js start anyway
 }
