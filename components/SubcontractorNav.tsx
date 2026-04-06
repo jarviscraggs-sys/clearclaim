@@ -73,7 +73,7 @@ export default function SubcontractorNav({ user }: { user?: any }) {
             {initial}
           </div>
           <button
-            onClick={() => signOut({ callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || ''}/login` })}
+            onClick={() => signOut({ callbackUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/login` })}
             className="text-xs text-blue-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/10 transition"
           >
             Sign out

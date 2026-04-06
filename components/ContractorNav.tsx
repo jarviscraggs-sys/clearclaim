@@ -148,7 +148,7 @@ export default function ContractorNav({ user }: { user?: any }) {
             </div>
           </div>
           <button
-            onClick={() => signOut({ callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || ''}/login` })}
+            onClick={() => signOut({ callbackUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/login` })}
             className="w-full text-xs text-blue-400 hover:text-white py-2 px-3 rounded-lg hover:bg-red-900/20 transition text-left"
           >
             Sign out →
