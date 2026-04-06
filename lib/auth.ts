@@ -5,7 +5,7 @@ import { getDb } from './db';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
+
   providers: [
     Credentials({
       name: 'credentials',
@@ -63,6 +63,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: {
     signIn: '/login',
   },
-  secret: process.env.NEXTAUTH_SECRET || 'clearclaim-secret-key-for-dev-only',
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'clearclaim-dev-secret',
   session: { strategy: 'jwt' },
 });
