@@ -312,3 +312,4 @@ try {
   console.error('[ClearClaim] CWD:', process.cwd());
   // Don't exit — let Next.js start anyway
 }
+// Tue Apr  7 20:21:17 BST 2026
