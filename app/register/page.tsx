@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -11,7 +11,7 @@ interface InviteData {
   cis_rate: number;
 }
 
-export default function RegisterPage() {
+function RegisterContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -28,7 +28,6 @@ export default function RegisterPage() {
       return;
     }
 
-    // Fetch invite data from token
     fetch(`/api/auth/register?token=${encodeURIComponent(token)}`)
       .then(async (res) => {
         const data = await res.json();
@@ -52,7 +51,6 @@ export default function RegisterPage() {
       setError('Password must be at least 8 characters');
       return;
     }
-
     setSubmitting(true);
     setError('');
     try {
@@ -112,11 +110,9 @@ export default function RegisterPage() {
           ) : (
             <>
               <h2 className="text-xl font-semibold text-white mb-6">Create your account</h2>
-
               {error && (
                 <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-lg text-red-300 text-sm">{error}</div>
               )}
-
               {invite && (
                 <div className="mb-6 p-4 bg-blue-500/10 border border-blue-400/20 rounded-xl space-y-2">
                   <p className="text-blue-200 text-sm font-medium">Your invite details</p>
@@ -127,7 +123,6 @@ export default function RegisterPage() {
                   </div>
                 </div>
               )}
-
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-blue-200 mb-1.5">Password</label>
@@ -140,7 +135,6 @@ export default function RegisterPage() {
                     className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-blue-200 mb-1.5">Confirm Password</label>
                   <input
@@ -152,7 +146,6 @@ export default function RegisterPage() {
                     className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
                   />
                 </div>
-
                 <button
                   type="submit"
                   disabled={submitting}
@@ -161,17 +154,26 @@ export default function RegisterPage() {
                   {submitting ? 'Creating account...' : 'Create account'}
                 </button>
               </form>
-
               <p className="mt-4 text-center text-sm text-gray-400">
                 Already have an account?{' '}
-                <Link href="/login" className="text-blue-300 hover:text-blue-200 transition">
-                  Sign in →
-                </Link>
+                <Link href="/login" className="text-blue-300 hover:text-blue-200 transition">Sign in →</Link>
               </p>
             </>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-800 flex items-center justify-center">
+        <div className="inline-block w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <RegisterContent />
+    </Suspense>
   );
 }
