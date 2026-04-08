@@ -299,6 +299,22 @@ export function buildInviteEmail(opts: {
   `);
 }
 
+export function buildAdminInviteEmail(opts: {
+  contractorCompany: string;
+  inviterName: string;
+  inviteLink: string;
+}): string {
+  const { contractorCompany, inviterName, inviteLink } = opts;
+  return emailWrapper(`
+    <p><strong>${inviterName}</strong> has invited you to join <strong>${contractorCompany}</strong> as an admin on ClearClaim.</p>
+    <p>You'll have full access to manage invoices, projects, timesheets and more.</p>
+    <div class="cta">
+      <a href="${inviteLink}">Set Up Your Account &rarr;</a>
+    </div>
+    <p style="font-size:13px;color:#6b7280;">This invite expires in 7 days.</p>
+  `);
+}
+
 export function buildPasswordResetEmail(opts: {
   resetLink: string;
 }): string {

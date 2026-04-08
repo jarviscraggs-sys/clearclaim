@@ -54,6 +54,7 @@ const navSections = [
     label: 'Account',
     items: [
       { href: '/contractor/settings', label: 'Settings', icon: '⚙️' },
+      { href: '/contractor/settings/team', label: 'Team', icon: '👥' },
     ],
   },
 ];

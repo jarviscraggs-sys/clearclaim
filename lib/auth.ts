@@ -37,11 +37,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const valid = await bcrypt.compare(credentials.password as string, user.password_hash);
           if (!valid) return null;
 
+          // If this is a team admin, use the parent contractor's ID for data access
+          const effectiveId = user.parent_contractor_id ? String(user.parent_contractor_id) : String(user.id);
+          const effectiveRole = user.is_team_admin ? 'contractor' : user.role;
+
           return {
-            id: String(user.id),
+            id: effectiveId,
             email: user.email,
             name: user.name,
-            role: user.role,
+            role: effectiveRole,
             company: user.company,
             employeeId: user.employee_id ? String(user.employee_id) : undefined,
           };
