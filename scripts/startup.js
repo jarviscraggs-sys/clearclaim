@@ -1,4 +1,4 @@
-// Startup script — initialises SQLite DB and seeds demo accounts on Railway
+// Startup script — initialises SQLite DB schema. Demo seeding only runs if SEED_DEMO=true.
 const path = require('path');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
@@ -275,12 +275,79 @@ try {
     );
   `);
 
-  // Seed demo accounts if no users exist
+  // --- Production cleanup: remove demo accounts if SEED_DEMO is not set ---
+  if (process.env.SEED_DEMO !== 'true') {
+    const demoPattern = '%@getclearclaim.co.uk';
+    const demoCount = db.prepare('SELECT COUNT(*) as c FROM users WHERE email LIKE ?').get(demoPattern).c;
+    if (demoCount > 0) {
+      console.log(`[ClearClaim] SEED_DEMO not set — removing ${demoCount} demo account(s) and related data from production DB...`);
+      const run = (sql, params = []) => db.prepare(sql).run(...params);
+
+      // Helper to reuse the same pattern multiple times
+      const patt = (n) => Array(n).fill(demoPattern);
+
+      run(`DELETE FROM dispute_timeline WHERE dispute_id IN (
+        SELECT id FROM disputes WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
+          OR subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?)
+          OR invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))
+      )`, patt(3));
+
+      run(`DELETE FROM disputes WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
+        OR subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?)
+        OR invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(3));
+
+      run(`DELETE FROM variations WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
+        OR subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?)
+        OR invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))
+        OR project_id IN (SELECT id FROM projects WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(4));
+
+      run(`DELETE FROM ai_flags WHERE invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))
+        OR matched_invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(2));
+
+      run(`DELETE FROM attachments WHERE invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(1));
+      run(`DELETE FROM invoice_lines WHERE invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(1));
+
+      run(`DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(1));
+      run(`DELETE FROM invites WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(1));
+      run(`DELETE FROM employee_invites WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
+        OR employee_id IN (SELECT id FROM employees WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(2));
+
+      run(`DELETE FROM timesheets WHERE employee_id IN (SELECT id FROM employees WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(1));
+      run(`DELETE FROM holiday_requests WHERE employee_id IN (SELECT id FROM employees WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(1));
+
+      run(`DELETE FROM subcontractor_compliance WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
+        OR subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(2));
+
+      run(`DELETE FROM cis_verifications WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
+        OR subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(2));
+
+      run(`DELETE FROM project_documents WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
+        OR project_id IN (SELECT id FROM projects WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(2));
+
+      run(`DELETE FROM audit_log WHERE user_id IN (SELECT id FROM users WHERE email LIKE ?)
+        OR invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(2));
+
+      run(`DELETE FROM employees WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
+        OR user_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(2));
+
+      run(`DELETE FROM projects WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(1));
+      run(`DELETE FROM contractor_settings WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(1));
+
+      run(`DELETE FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(1));
+
+      run(`DELETE FROM users WHERE email LIKE ?`, patt(1));
+      console.log('[ClearClaim] Demo accounts removed. Production DB is now clean.');
+    } else {
+      console.log('[ClearClaim] SEED_DEMO not set — no demo accounts found. Production DB already clean.');
+    }
+  }
+
+  // Seed demo accounts only if SEED_DEMO=true and DB is empty
   const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
   console.log('[ClearClaim] Users in DB:', userCount.c);
 
-  if (userCount.c === 0) {
-    console.log('[ClearClaim] Seeding demo accounts...');
+  if (process.env.SEED_DEMO === 'true' && userCount.c === 0) {
+    console.log('[ClearClaim] SEED_DEMO=true — seeding demo accounts...');
     const hash = bcrypt.hashSync('demo123', 10);
 
     // --- Contractor ---
@@ -434,12 +501,9 @@ try {
     console.log('[ClearClaim] Logins: contractor@getclearclaim.co.uk / demo123');
     console.log('[ClearClaim]         sub1/sub2/sub3@getclearclaim.co.uk / demo123');
     console.log('[ClearClaim]         emp1/emp2/emp3@getclearclaim.co.uk / demo123');
+  } else if (process.env.SEED_DEMO !== 'true') {
+    console.log('[ClearClaim] SEED_DEMO not set — skipping demo data. Fresh production mode.');
   }
-
-  // Always ensure demo passwords are correct (safe to re-run after deploy)
-  const demoHash = bcrypt.hashSync('demo123', 10);
-  db.prepare("UPDATE users SET password_hash = ? WHERE email LIKE '%@getclearclaim.co.uk'").run(demoHash);
-  console.log('[ClearClaim] Demo passwords verified/reset.');
 
   db.close();
   console.log('[ClearClaim] Startup complete.');
