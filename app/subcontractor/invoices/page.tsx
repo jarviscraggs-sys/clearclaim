@@ -14,7 +14,7 @@ const statusConfig: Record<string, { label: string; color: string; bg: string; d
 export default async function SubcontractorInvoicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; contractor_id?: string }>;
 }) {
   const session = await auth();
   const user = session!.user as any;
@@ -24,12 +24,38 @@ export default async function SubcontractorInvoicesPage({
   const params = await searchParams;
   const filterStatus = params?.status || 'all';
   const search = params?.q || '';
+  const contractorFilterRaw = params?.contractor_id || '';
+  const contractorFilterId = contractorFilterRaw ? parseInt(contractorFilterRaw) : null;
 
-  const allInvoices = db.prepare(`
+  const linkedContractors = db.prepare(`
+    SELECT u.id, u.name, u.company
+    FROM subcontractor_contractors sc
+    JOIN users u ON u.id = sc.contractor_id
+    WHERE sc.subcontractor_id = ?
+    ORDER BY u.company, u.name
+  `).all(userId) as { id: number; name: string; company: string }[];
+
+  let invoicesQuery = `
     SELECT * FROM invoices
     WHERE subcontractor_id = ?
-    ORDER BY submitted_at DESC
-  `).all(userId) as any[];
+  `;
+  const invoiceParams: any[] = [userId];
+  if (contractorFilterId) {
+    invoicesQuery += ' AND (contractor_id = ? OR contractor_id IS NULL)';
+    invoiceParams.push(contractorFilterId);
+  }
+  invoicesQuery += ' ORDER BY submitted_at DESC';
+
+  const allInvoices = db.prepare(invoicesQuery).all(...invoiceParams) as any[];
+
+  const makeInvoicesHref = (status: string, q: string, contractorId: string) => {
+    const qs = new URLSearchParams();
+    if (status && status !== 'all') qs.set('status', status);
+    if (q) qs.set('q', q);
+    if (contractorId) qs.set('contractor_id', contractorId);
+    const built = qs.toString();
+    return built ? `/subcontractor/invoices?${built}` : '/subcontractor/invoices';
+  };
 
   // Count per status
   const counts: Record<string, number> = { all: allInvoices.length };
@@ -71,6 +97,34 @@ export default async function SubcontractorInvoicesPage({
         </Link>
       </div>
 
+      {linkedContractors.length > 1 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Link
+            href={makeInvoicesHref(filterStatus, search, '')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition border ${
+              !contractorFilterRaw
+                ? 'bg-blue-600 text-white border-blue-500'
+                : 'bg-white/5 text-blue-300 border-white/10 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            All Contractors
+          </Link>
+          {linkedContractors.map((contractor) => (
+            <Link
+              key={contractor.id}
+              href={makeInvoicesHref(filterStatus, search, String(contractor.id))}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition border ${
+                contractorFilterRaw === String(contractor.id)
+                  ? 'bg-blue-600 text-white border-blue-500'
+                  : 'bg-white/5 text-blue-300 border-white/10 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              {contractor.company || contractor.name}
+            </Link>
+          ))}
+        </div>
+      )}
+
       {/* Filter Tabs */}
       <div className="flex flex-wrap gap-2 mb-4">
         {tabs.map(tab => {
@@ -80,7 +134,7 @@ export default async function SubcontractorInvoicesPage({
           return (
             <Link
               key={tab}
-              href={`/subcontractor/invoices?status=${tab}${search ? `&q=${encodeURIComponent(search)}` : ''}`}
+              href={makeInvoicesHref(tab, search, contractorFilterRaw)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition border ${
                 isActive
                   ? 'bg-blue-600 text-white border-blue-500'
@@ -101,6 +155,7 @@ export default async function SubcontractorInvoicesPage({
       {/* Search */}
       <form method="GET" action="/subcontractor/invoices" className="mb-5">
         <input type="hidden" name="status" value={filterStatus} />
+        <input type="hidden" name="contractor_id" value={contractorFilterRaw} />
         <div className="relative max-w-sm">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400 text-sm">🔍</span>
           <input

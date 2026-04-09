@@ -71,6 +71,14 @@ export default async function SubcontractorDashboard() {
   statusCounts.forEach(r => { statusMap[r.status] = r.cnt; });
   const totalInvoices = Object.values(statusMap).reduce((a, b) => a + b, 0);
 
+  const linkedContractors = db.prepare(`
+    SELECT u.id, u.name, u.company
+    FROM subcontractor_contractors sc
+    JOIN users u ON u.id = sc.contractor_id
+    WHERE sc.subcontractor_id = ?
+    ORDER BY u.company, u.name
+  `).all(userId) as { id: number; name: string; company: string }[];
+
   const approvedCnt  = statusMap['approved']  ?? 0;
   const pendingCnt   = statusMap['pending']   ?? 0;
   const queriedCnt   = statusMap['queried']   ?? 0;
@@ -156,6 +164,25 @@ export default async function SubcontractorDashboard() {
           + Submit Invoice
         </Link>
       </div>
+
+      {linkedContractors.length > 1 && (
+        <div className="mb-8 bg-white/5 border border-white/10 rounded-2xl p-6">
+          <h2 className="font-semibold text-white mb-4 text-lg">Your Contractors</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {linkedContractors.map((contractor) => (
+              <div key={contractor.id} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+                <p className="text-sm font-semibold text-white">{contractor.company || contractor.name}</p>
+                <Link
+                  href={`/subcontractor/invoices?contractor_id=${contractor.id}`}
+                  className="text-xs text-blue-400 hover:text-blue-300 transition mt-1 inline-block"
+                >
+                  View Invoices →
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Alerts */}
       {alerts.length > 0 && (

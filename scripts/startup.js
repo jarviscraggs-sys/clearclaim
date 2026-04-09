@@ -273,7 +273,43 @@ try {
       description TEXT,
       uploaded_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS subcontractor_contractors (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      subcontractor_id INTEGER NOT NULL,
+      contractor_id INTEGER NOT NULL,
+      cis_rate INTEGER DEFAULT 20,
+      linked_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(subcontractor_id, contractor_id),
+      FOREIGN KEY (subcontractor_id) REFERENCES users(id),
+      FOREIGN KEY (contractor_id) REFERENCES users(id)
+    );
   `);
+
+  // Migration: add contractor_id to invoices if not present
+  try {
+    db.exec(`ALTER TABLE invoices ADD COLUMN contractor_id INTEGER REFERENCES users(id)`);
+    console.log('[ClearClaim] Migration: added contractor_id to invoices.');
+  } catch(e) { /* column already exists - fine */ }
+
+  // Migration: backfill subcontractor_contractors from existing used invites
+  const existingLinks = db.prepare('SELECT COUNT(*) as c FROM subcontractor_contractors').get();
+  if (existingLinks.c === 0) {
+    const usedInvites = db.prepare(`
+      SELECT inv.contractor_id, u.id as sub_id, inv.cis_rate
+      FROM invites inv
+      JOIN users u ON u.email = inv.email
+      WHERE inv.used = 1
+    `).all();
+    for (const inv of usedInvites) {
+      try {
+        db.prepare(`INSERT OR IGNORE INTO subcontractor_contractors (subcontractor_id, contractor_id, cis_rate) VALUES (?, ?, ?)`)
+          .run(inv.sub_id, inv.contractor_id, inv.cis_rate || 20);
+      } catch(e) {}
+    }
+    if (usedInvites.length > 0) {
+      console.log(`[ClearClaim] Migration: backfilled ${usedInvites.length} sub-contractor link(s).`);
+    }
+  }
 
   // --- Production cleanup: remove demo accounts if SEED_DEMO is not set ---
   if (process.env.SEED_DEMO !== 'true') {

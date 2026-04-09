@@ -11,6 +11,13 @@ interface JobLine {
   line_value: string;
 }
 
+interface Contractor {
+  id: number;
+  name: string;
+  company: string;
+  email: string;
+}
+
 let lineCounter = 1;
 
 function emptyLine(): JobLine {
@@ -35,12 +42,29 @@ export default function SubmitInvoicePage() {
 
   const [projects, setProjects] = useState<Array<{ id: number; name: string; reference: string }>>([]);
   const [projectId, setProjectId] = useState('');
+  const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [contractorsLoading, setContractorsLoading] = useState(true);
+  const [selectedContractorId, setSelectedContractorId] = useState('');
 
   useEffect(() => {
     fetch('/api/projects')
       .then(r => r.json())
       .then(d => setProjects(d.projects || []))
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/subcontractor/contractors')
+      .then(r => r.json())
+      .then(d => {
+        const list = (d.contractors || []) as Contractor[];
+        setContractors(list);
+        if (list.length === 1) {
+          setSelectedContractorId(String(list[0].id));
+        }
+      })
+      .catch(() => setContractors([]))
+      .finally(() => setContractorsLoading(false));
   }, []);
 
   useEffect(() => {
@@ -86,6 +110,12 @@ export default function SubmitInvoicePage() {
     setLoading(true);
     setError('');
 
+    if (!selectedContractorId) {
+      setError('Please select a contractor before submitting');
+      setLoading(false);
+      return;
+    }
+
     for (const line of jobLines) {
       if (!line.job_code.trim() || !line.area.trim() || !line.description.trim() || !line.line_value) {
         setError('Please complete all fields in every job line.');
@@ -101,6 +131,7 @@ export default function SubmitInvoicePage() {
 
     const form = e.currentTarget;
     const formData = new FormData(form);
+    formData.set('contractor_id', selectedContractorId);
 
     formData.set('job_lines', JSON.stringify(jobLines.map(l => ({
       job_code: l.job_code.trim(),
@@ -173,7 +204,36 @@ export default function SubmitInvoicePage() {
         </div>
       )}
 
+      {contractorsLoading ? (
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-sm text-blue-300">
+          Loading contractor links...
+        </div>
+      ) : contractors.length === 0 ? (
+        <div className="bg-amber-500/15 border border-amber-500/40 rounded-2xl p-6 text-amber-300">
+          You are not linked to any contractors yet. Ask your contractor to send you an invite.
+        </div>
+      ) : (
       <form onSubmit={handleSubmit} className="space-y-6">
+        {contractors.length > 1 && (
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+            <label className={labelCls}>
+              Submit invoice to: <span className="text-red-400">*</span>
+            </label>
+            <select
+              value={selectedContractorId}
+              onChange={e => setSelectedContractorId(e.target.value)}
+              className={inputCls}
+              required
+            >
+              <option value="">Select a contractor</option>
+              {contractors.map((contractor) => (
+                <option key={contractor.id} value={contractor.id}>
+                  {contractor.company || contractor.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Invoice Details */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
@@ -521,6 +581,7 @@ export default function SubmitInvoicePage() {
           </button>
         </div>
       </form>
+      )}
     </div>
   );
 }
