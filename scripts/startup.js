@@ -378,11 +378,15 @@ try {
     }
   }
 
-  // Seed demo accounts only if SEED_DEMO=true and DB is empty
+  // Seed demo accounts if SEED_DEMO=true and any demo account is missing
   const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
   console.log('[ClearClaim] Users in DB:', userCount.c);
 
-  if (process.env.SEED_DEMO === 'true' && userCount.c === 0) {
+  const demoExists = process.env.SEED_DEMO === 'true'
+    ? db.prepare("SELECT COUNT(*) as c FROM users WHERE email = 'contractor@getclearclaim.co.uk'").get().c > 0
+    : false;
+
+  if (process.env.SEED_DEMO === 'true' && !demoExists) {
     console.log('[ClearClaim] SEED_DEMO=true — seeding demo accounts...');
     const hash = bcrypt.hashSync('demo123', 10);
 
@@ -400,9 +404,15 @@ try {
       `INSERT INTO users (email, password_hash, name, company, role) VALUES (?, ?, ?, ?, ?)`
     ).run('sub2@getclearclaim.co.uk', hash, 'Tom Jones', 'Jones Groundworks', 'subcontractor').lastInsertRowid;
 
-    db.prepare(
+    const sub3Id = db.prepare(
       `INSERT INTO users (email, password_hash, name, company, role) VALUES (?, ?, ?, ?, ?)`
-    ).run('sub3@getclearclaim.co.uk', hash, 'Pete Sykes', 'Peak Plumbing Services', 'subcontractor');
+    ).run('sub3@getclearclaim.co.uk', hash, 'Pete Sykes', 'Peak Plumbing Services', 'subcontractor').lastInsertRowid;
+
+    // --- Link subcontractors to contractor ---
+    const linkSub = db.prepare(`INSERT OR IGNORE INTO subcontractor_contractors (subcontractor_id, contractor_id, cis_rate) VALUES (?, ?, ?)`);
+    linkSub.run(sub1Id, contractorId, 20);
+    linkSub.run(sub2Id, contractorId, 20);
+    linkSub.run(sub3Id, contractorId, 20);
 
     // --- Employee users ---
     const emp1UserId = db.prepare(
@@ -423,28 +433,28 @@ try {
     // --- Demo invoices from Smith Electrical Ltd (sub1) ---
     const insertInvoice = db.prepare(`
       INSERT INTO invoices
-        (subcontractor_id, invoice_number, description, amount, vat_amount, work_from, work_to,
+        (subcontractor_id, contractor_id, invoice_number, description, amount, vat_amount, work_from, work_to,
          cis_rate, cis_amount, status, submitted_at, reviewed_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    insertInvoice.run(sub1Id, 'INV-2024-001', 'Electrical installation – first fix', 3200, 640,
+    insertInvoice.run(sub1Id, contractorId, 'INV-2024-001', 'Electrical installation – first fix', 3200, 640,
       '2024-01-08', '2024-01-19', 20, 640, 'approved', '2024-01-22 09:00:00', '2024-01-25 14:30:00');
 
-    insertInvoice.run(sub1Id, 'INV-2024-002', 'Second fix wiring – kitchens & bathrooms', 1850, 370,
+    insertInvoice.run(sub1Id, contractorId, 'INV-2024-002', 'Second fix wiring – kitchens & bathrooms', 1850, 370,
       '2024-02-05', '2024-02-16', 20, 370, 'approved', '2024-02-19 10:15:00', '2024-02-22 11:00:00');
 
-    insertInvoice.run(sub1Id, 'INV-2024-003', 'Distribution board upgrade', 2400, 480,
+    insertInvoice.run(sub1Id, contractorId, 'INV-2024-003', 'Distribution board upgrade', 2400, 480,
       '2024-03-04', '2024-03-08', 0, 0, 'pending', '2024-03-11 08:45:00', null);
 
-    insertInvoice.run(sub1Id, 'INV-2024-004', 'Emergency lighting installation', 1100, 220,
+    insertInvoice.run(sub1Id, contractorId, 'INV-2024-004', 'Emergency lighting installation', 1100, 220,
       '2024-03-11', '2024-03-15', 0, 0, 'queried', '2024-03-18 09:30:00', '2024-03-20 16:00:00');
 
     // --- Demo invoices from Jones Groundworks (sub2) ---
-    insertInvoice.run(sub2Id, 'INV-GW-001', 'Foundation excavation and groundworks', 4500, 900,
+    insertInvoice.run(sub2Id, contractorId, 'INV-GW-001', 'Foundation excavation and groundworks', 4500, 900,
       '2024-01-15', '2024-01-26', 20, 900, 'approved', '2024-01-29 08:00:00', '2024-02-01 09:15:00');
 
-    insertInvoice.run(sub2Id, 'INV-GW-002', 'Drainage works and soakaway installation', 2800, 560,
+    insertInvoice.run(sub2Id, contractorId, 'INV-GW-002', 'Drainage works and soakaway installation', 2800, 560,
       '2024-02-19', '2024-03-01', 0, 0, 'pending', '2024-03-04 07:30:00', null);
 
     // --- Employee records ---
