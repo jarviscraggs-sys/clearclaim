@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#0a0f1e" rx="60"/>
+
+  <!-- Blue icon box -->
+  <rect x="196" y="80" width="120" height="120" rx="24" fill="#3b82f6"/>
+
+  <!-- Document icon (white) -->
+  <rect x="224" y="105" width="64" height="70" rx="6" fill="white"/>
+  <!-- Document lines -->
+  <rect x="234" y="125" width="44" height="5" rx="2.5" fill="#3b82f6"/>
+  <rect x="234" y="138" width="44" height="5" rx="2.5" fill="#3b82f6"/>
+  <rect x="234" y="151" width="30" height="5" rx="2.5" fill="#3b82f6"/>
+  <!-- Document corner fold -->
+  <polygon points="272,105 288,121 272,121" fill="#bfdbfe"/>
+
+  <!-- ClearClaim text -->
+  <text
+    x="256"
+    y="268"
+    text-anchor="middle"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="52"
+    font-weight="800"
+    fill="white"
+    letter-spacing="-1">ClearClaim</text>
+
+  <!-- Divider line -->
+  <rect x="156" y="285" width="200" height="2" rx="1" fill="#3b82f6" opacity="0.5"/>
+
+  <!-- Subtitle -->
+  <text
+    x="256"
+    y="318"
+    text-anchor="middle"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="22"
+    font-weight="400"
+    fill="#93c5fd"
+    letter-spacing="2">CONSTRUCTION PAYMENTS</text>
+
+  <!-- Tagline -->
+  <text
+    x="256"
+    y="360"
+    text-anchor="middle"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="16"
+    font-weight="300"
+    fill="#475569"
+    letter-spacing="1">Invoice · CIS · Retention</text>
+</svg>
