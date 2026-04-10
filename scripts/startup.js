@@ -1,4 +1,4 @@
-// Startup script — initialises SQLite DB schema. Demo seeding only runs if SEED_DEMO=true.
+// Startup script — initialises SQLite DB and seeds demo accounts on Railway
 const path = require('path');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
@@ -273,121 +273,14 @@ try {
       description TEXT,
       uploaded_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
-    CREATE TABLE IF NOT EXISTS subcontractor_contractors (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      subcontractor_id INTEGER NOT NULL,
-      contractor_id INTEGER NOT NULL,
-      cis_rate INTEGER DEFAULT 20,
-      linked_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(subcontractor_id, contractor_id),
-      FOREIGN KEY (subcontractor_id) REFERENCES users(id),
-      FOREIGN KEY (contractor_id) REFERENCES users(id)
-    );
   `);
 
-  // Migration: add contractor_id to invoices if not present
-  try {
-    db.exec(`ALTER TABLE invoices ADD COLUMN contractor_id INTEGER REFERENCES users(id)`);
-    console.log('[ClearClaim] Migration: added contractor_id to invoices.');
-  } catch(e) { /* column already exists - fine */ }
-
-  // Migration: backfill subcontractor_contractors from existing used invites
-  const existingLinks = db.prepare('SELECT COUNT(*) as c FROM subcontractor_contractors').get();
-  if (existingLinks.c === 0) {
-    const usedInvites = db.prepare(`
-      SELECT inv.contractor_id, u.id as sub_id, inv.cis_rate
-      FROM invites inv
-      JOIN users u ON u.email = inv.email
-      WHERE inv.used = 1
-    `).all();
-    for (const inv of usedInvites) {
-      try {
-        db.prepare(`INSERT OR IGNORE INTO subcontractor_contractors (subcontractor_id, contractor_id, cis_rate) VALUES (?, ?, ?)`)
-          .run(inv.sub_id, inv.contractor_id, inv.cis_rate || 20);
-      } catch(e) {}
-    }
-    if (usedInvites.length > 0) {
-      console.log(`[ClearClaim] Migration: backfilled ${usedInvites.length} sub-contractor link(s).`);
-    }
-  }
-
-  // --- Production cleanup: remove demo accounts if SEED_DEMO is not set ---
-  if (process.env.SEED_DEMO !== 'true') {
-    const demoPattern = '%@getclearclaim.co.uk';
-    const demoCount = db.prepare('SELECT COUNT(*) as c FROM users WHERE email LIKE ?').get(demoPattern).c;
-    if (demoCount > 0) {
-      console.log(`[ClearClaim] SEED_DEMO not set — removing ${demoCount} demo account(s) and related data from production DB...`);
-      const run = (sql, params = []) => db.prepare(sql).run(...params);
-
-      // Helper to reuse the same pattern multiple times
-      const patt = (n) => Array(n).fill(demoPattern);
-
-      run(`DELETE FROM dispute_timeline WHERE dispute_id IN (
-        SELECT id FROM disputes WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
-          OR subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?)
-          OR invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))
-      )`, patt(3));
-
-      run(`DELETE FROM disputes WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
-        OR subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?)
-        OR invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(3));
-
-      run(`DELETE FROM variations WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
-        OR subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?)
-        OR invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))
-        OR project_id IN (SELECT id FROM projects WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(4));
-
-      run(`DELETE FROM ai_flags WHERE invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))
-        OR matched_invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(2));
-
-      run(`DELETE FROM attachments WHERE invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(1));
-      run(`DELETE FROM invoice_lines WHERE invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(1));
-
-      run(`DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(1));
-      run(`DELETE FROM invites WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(1));
-      run(`DELETE FROM employee_invites WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
-        OR employee_id IN (SELECT id FROM employees WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(2));
-
-      run(`DELETE FROM timesheets WHERE employee_id IN (SELECT id FROM employees WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(1));
-      run(`DELETE FROM holiday_requests WHERE employee_id IN (SELECT id FROM employees WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(1));
-
-      run(`DELETE FROM subcontractor_compliance WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
-        OR subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(2));
-
-      run(`DELETE FROM cis_verifications WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
-        OR subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(2));
-
-      run(`DELETE FROM project_documents WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
-        OR project_id IN (SELECT id FROM projects WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(2));
-
-      run(`DELETE FROM audit_log WHERE user_id IN (SELECT id FROM users WHERE email LIKE ?)
-        OR invoice_id IN (SELECT id FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?))`, patt(2));
-
-      run(`DELETE FROM employees WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)
-        OR user_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(2));
-
-      run(`DELETE FROM projects WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(1));
-      run(`DELETE FROM contractor_settings WHERE contractor_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(1));
-
-      run(`DELETE FROM invoices WHERE subcontractor_id IN (SELECT id FROM users WHERE email LIKE ?)`, patt(1));
-
-      run(`DELETE FROM users WHERE email LIKE ?`, patt(1));
-      console.log('[ClearClaim] Demo accounts removed. Production DB is now clean.');
-    } else {
-      console.log('[ClearClaim] SEED_DEMO not set — no demo accounts found. Production DB already clean.');
-    }
-  }
-
-  // Seed demo accounts if SEED_DEMO=true and any demo account is missing
+  // Seed demo accounts if no users exist
   const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
   console.log('[ClearClaim] Users in DB:', userCount.c);
 
-  const demoExists = process.env.SEED_DEMO === 'true'
-    ? db.prepare("SELECT COUNT(*) as c FROM users WHERE email = 'contractor@getclearclaim.co.uk'").get().c > 0
-    : false;
-
-  if (process.env.SEED_DEMO === 'true' && !demoExists) {
-    console.log('[ClearClaim] SEED_DEMO=true — seeding demo accounts...');
+  if (userCount.c === 0) {
+    console.log('[ClearClaim] Seeding demo accounts...');
     const hash = bcrypt.hashSync('demo123', 10);
 
     // --- Contractor ---
@@ -404,15 +297,9 @@ try {
       `INSERT INTO users (email, password_hash, name, company, role) VALUES (?, ?, ?, ?, ?)`
     ).run('sub2@getclearclaim.co.uk', hash, 'Tom Jones', 'Jones Groundworks', 'subcontractor').lastInsertRowid;
 
-    const sub3Id = db.prepare(
+    db.prepare(
       `INSERT INTO users (email, password_hash, name, company, role) VALUES (?, ?, ?, ?, ?)`
-    ).run('sub3@getclearclaim.co.uk', hash, 'Pete Sykes', 'Peak Plumbing Services', 'subcontractor').lastInsertRowid;
-
-    // --- Link subcontractors to contractor ---
-    const linkSub = db.prepare(`INSERT OR IGNORE INTO subcontractor_contractors (subcontractor_id, contractor_id, cis_rate) VALUES (?, ?, ?)`);
-    linkSub.run(sub1Id, contractorId, 20);
-    linkSub.run(sub2Id, contractorId, 20);
-    linkSub.run(sub3Id, contractorId, 20);
+    ).run('sub3@getclearclaim.co.uk', hash, 'Pete Sykes', 'Peak Plumbing Services', 'subcontractor');
 
     // --- Employee users ---
     const emp1UserId = db.prepare(
@@ -433,28 +320,28 @@ try {
     // --- Demo invoices from Smith Electrical Ltd (sub1) ---
     const insertInvoice = db.prepare(`
       INSERT INTO invoices
-        (subcontractor_id, contractor_id, invoice_number, description, amount, vat_amount, work_from, work_to,
+        (subcontractor_id, invoice_number, description, amount, vat_amount, work_from, work_to,
          cis_rate, cis_amount, status, submitted_at, reviewed_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    insertInvoice.run(sub1Id, contractorId, 'INV-2024-001', 'Electrical installation – first fix', 3200, 640,
+    insertInvoice.run(sub1Id, 'INV-2024-001', 'Electrical installation – first fix', 3200, 640,
       '2024-01-08', '2024-01-19', 20, 640, 'approved', '2024-01-22 09:00:00', '2024-01-25 14:30:00');
 
-    insertInvoice.run(sub1Id, contractorId, 'INV-2024-002', 'Second fix wiring – kitchens & bathrooms', 1850, 370,
+    insertInvoice.run(sub1Id, 'INV-2024-002', 'Second fix wiring – kitchens & bathrooms', 1850, 370,
       '2024-02-05', '2024-02-16', 20, 370, 'approved', '2024-02-19 10:15:00', '2024-02-22 11:00:00');
 
-    insertInvoice.run(sub1Id, contractorId, 'INV-2024-003', 'Distribution board upgrade', 2400, 480,
+    insertInvoice.run(sub1Id, 'INV-2024-003', 'Distribution board upgrade', 2400, 480,
       '2024-03-04', '2024-03-08', 0, 0, 'pending', '2024-03-11 08:45:00', null);
 
-    insertInvoice.run(sub1Id, contractorId, 'INV-2024-004', 'Emergency lighting installation', 1100, 220,
+    insertInvoice.run(sub1Id, 'INV-2024-004', 'Emergency lighting installation', 1100, 220,
       '2024-03-11', '2024-03-15', 0, 0, 'queried', '2024-03-18 09:30:00', '2024-03-20 16:00:00');
 
     // --- Demo invoices from Jones Groundworks (sub2) ---
-    insertInvoice.run(sub2Id, contractorId, 'INV-GW-001', 'Foundation excavation and groundworks', 4500, 900,
+    insertInvoice.run(sub2Id, 'INV-GW-001', 'Foundation excavation and groundworks', 4500, 900,
       '2024-01-15', '2024-01-26', 20, 900, 'approved', '2024-01-29 08:00:00', '2024-02-01 09:15:00');
 
-    insertInvoice.run(sub2Id, contractorId, 'INV-GW-002', 'Drainage works and soakaway installation', 2800, 560,
+    insertInvoice.run(sub2Id, 'INV-GW-002', 'Drainage works and soakaway installation', 2800, 560,
       '2024-02-19', '2024-03-01', 0, 0, 'pending', '2024-03-04 07:30:00', null);
 
     // --- Employee records ---
@@ -547,9 +434,12 @@ try {
     console.log('[ClearClaim] Logins: contractor@getclearclaim.co.uk / demo123');
     console.log('[ClearClaim]         sub1/sub2/sub3@getclearclaim.co.uk / demo123');
     console.log('[ClearClaim]         emp1/emp2/emp3@getclearclaim.co.uk / demo123');
-  } else if (process.env.SEED_DEMO !== 'true') {
-    console.log('[ClearClaim] SEED_DEMO not set — skipping demo data. Fresh production mode.');
   }
+
+  // Always ensure demo passwords are correct (safe to re-run after deploy)
+  const demoHash = bcrypt.hashSync('demo123', 10);
+  db.prepare("UPDATE users SET password_hash = ? WHERE email LIKE '%@getclearclaim.co.uk'").run(demoHash);
+  console.log('[ClearClaim] Demo passwords verified/reset.');
 
   db.close();
   console.log('[ClearClaim] Startup complete.');

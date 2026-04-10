@@ -37,22 +37,9 @@ export async function GET(req: NextRequest) {
   if (user.role === 'subcontractor') {
     query += ' AND i.subcontractor_id = ?';
     params.push(user.id);
-    // Allow filtering by contractor when sub has multiple
-    const contractorId = searchParams.get('contractor_id');
-    if (contractorId) {
-      query += ' AND i.contractor_id = ?';
-      params.push(parseInt(contractorId));
-    }
-  } else if (user.role === 'contractor') {
-    // Only show invoices directed at this contractor (or legacy ones with no contractor_id but from linked subs)
-    query += ` AND (i.contractor_id = ? OR (i.contractor_id IS NULL AND i.subcontractor_id IN (
-      SELECT subcontractor_id FROM subcontractor_contractors WHERE contractor_id = ?
-    )))`;
-    params.push(user.id, user.id);
-    if (subcontractorId) {
-      query += ' AND i.subcontractor_id = ?';
-      params.push(subcontractorId);
-    }
+  } else if (subcontractorId) {
+    query += ' AND i.subcontractor_id = ?';
+    params.push(subcontractorId);
   }
 
   if (status) {
@@ -156,26 +143,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Determine which contractor this invoice is for
-    let targetContractorId = formData.get('contractor_id') ? parseInt(formData.get('contractor_id') as string) : null;
-
-    const firstLink = db.prepare('SELECT contractor_id FROM subcontractor_contractors WHERE subcontractor_id = ? ORDER BY linked_at ASC').get(user.id) as any;
-    if (!targetContractorId && firstLink) {
-      targetContractorId = firstLink.contractor_id;
-    }
-
-    if (!targetContractorId) {
-      return NextResponse.json({ error: 'Select a contractor before submitting an invoice' }, { status: 400 });
-    }
-
-    // Validate the sub is actually linked to this contractor
-    const link = db.prepare('SELECT id FROM subcontractor_contractors WHERE subcontractor_id = ? AND contractor_id = ?').get(user.id, targetContractorId);
-    if (!link) return NextResponse.json({ error: 'You are not linked to this contractor' }, { status: 403 });
-
     const result = db.prepare(`
-      INSERT INTO invoices (subcontractor_id, contractor_id, invoice_number, description, amount, vat_amount, work_from, work_to, cost_code, po_reference, notes, job_description, cis_rate, cis_amount, retention_rate, retention_amount, retention_release_date, application_number, cumulative_value, previous_certified, this_application, project_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(user.id, targetContractorId, invoiceNumber, description, amount, vatAmount, workFrom, workTo, costCode || null, poReference || null, notes || null, jobDescription || null, cisRate, cisAmount, retentionRate, retentionAmount, retentionReleaseDate, applicationNumber, effectiveCumulative, previousCertified, thisApplication, projectId);
+      INSERT INTO invoices (subcontractor_id, invoice_number, description, amount, vat_amount, work_from, work_to, cost_code, po_reference, notes, job_description, cis_rate, cis_amount, retention_rate, retention_amount, retention_release_date, application_number, cumulative_value, previous_certified, this_application, project_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(user.id, invoiceNumber, description, amount, vatAmount, workFrom, workTo, costCode || null, poReference || null, notes || null, jobDescription || null, cisRate, cisAmount, retentionRate, retentionAmount, retentionReleaseDate, applicationNumber, effectiveCumulative, previousCertified, thisApplication, projectId);
 
     const invoiceId = result.lastInsertRowid as number;
 
@@ -223,13 +194,13 @@ export async function POST(req: NextRequest) {
       storeDuplicateFlags(invoiceId, flags);
     }
 
-    // Send email notification to the contractor about this invoice
+    // Send email notification to contractor(s) about new invoice
     try {
-      const contractor = db.prepare('SELECT * FROM users WHERE id = ?').get(targetContractorId) as any;
+      const contractors = db.prepare(`SELECT * FROM users WHERE role = 'contractor'`).all() as any[];
       const subcontractor = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as any;
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002';
 
-      if (contractor) {
+      for (const contractor of contractors) {
         await sendEmail({
           to: contractor.email,
           subject: `New Invoice Submitted \u2014 ${invoiceNumber} from ${subcontractor?.company || subcontractor?.name || 'Subcontractor'}`,
@@ -254,15 +225,18 @@ export async function POST(req: NextRequest) {
       logAction(invoiceId, parseInt(user.id), user.name || user.email, 'submitted', `Invoice ${invoiceNumber} submitted — £${amount.toFixed(2)}`);
     } catch (e) { console.error('Audit log error:', e); }
 
-    // In-app notification for the contractor
+    // In-app notifications for contractor(s)
     try {
-      createNotification(
-        targetContractorId,
-        'invoice_submitted',
-        'New Invoice Submitted',
-        `Invoice ${invoiceNumber} submitted — £${amount.toFixed(2)}`,
-        `/contractor/invoice/${invoiceId}`
-      );
+      const contractors2 = db.prepare(`SELECT id FROM users WHERE role = 'contractor'`).all() as any[];
+      for (const c of contractors2) {
+        createNotification(
+          c.id,
+          'invoice_submitted',
+          'New Invoice Submitted',
+          `Invoice ${invoiceNumber} submitted — £${amount.toFixed(2)}`,
+          `/contractor/invoice/${invoiceId}`
+        );
+      }
     } catch (e) { console.error('Notification error:', e); }
 
     return NextResponse.json({ success: true, invoiceId, flagCount: flags.length });

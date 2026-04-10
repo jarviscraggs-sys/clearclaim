@@ -26,13 +26,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'CIS rate must be 0, 20 or 30' }, { status: 400 });
     }
 
-    // Check if user already exists — if so, just add the contractor link (multi-contractor support)
-    const existingUser = db.prepare('SELECT id FROM users WHERE email = ? AND role = \'subcontractor\'').get(email) as any;
+    // Check if user already exists
+    const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
     if (existingUser) {
-      // Add link if not already linked
-      db.prepare(`INSERT OR IGNORE INTO subcontractor_contractors (subcontractor_id, contractor_id, cis_rate) VALUES (?, ?, ?)`)
-        .run(existingUser.id, user.id, cisRateNum);
-      // Still generate invite token so they get a welcome email / login reminder
+      return NextResponse.json({ error: 'A user with this email already exists' }, { status: 409 });
     }
 
     // Generate token

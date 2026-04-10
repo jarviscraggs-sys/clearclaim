@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { rateLimit } from '@/lib/rateLimit';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const userId = (session.user as any)?.id || 'unknown';
-  if (!rateLimit(`chat:${userId}`, 30, 60 * 1000)) {
-    return NextResponse.json({ error: 'Too many messages. Slow down.' }, { status: 429 });
-  }
 
   const { messages, role } = await req.json();
 

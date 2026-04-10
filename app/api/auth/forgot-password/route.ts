@@ -2,14 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { sendEmail, buildPasswordResetEmail } from '@/lib/email';
 import { randomBytes } from 'crypto';
-import { rateLimit } from '@/lib/rateLimit';
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for') || 'unknown';
-  if (!rateLimit(`forgot-password:${ip}`, 5, 60 * 60 * 1000)) {
-    return NextResponse.json({ error: 'Too many requests. Try again later.' }, { status: 429 });
-  }
-
   const db = getDb();
 
   try {

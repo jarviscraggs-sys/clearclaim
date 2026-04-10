@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { sendEmail, buildAdminInviteEmail } from '@/lib/email';
+import { sendEmail, buildInviteEmail } from '@/lib/email';
 import crypto from 'crypto';
 
 export async function GET() {
@@ -56,9 +56,8 @@ export async function POST(req: NextRequest) {
     await sendEmail({
       to: email,
       subject: `You've been invited to join ${contractor.company || contractor.name} on ClearClaim`,
-      html: buildAdminInviteEmail({
+      html: buildInviteEmail({
         contractorCompany: contractor.company || contractor.name,
-        inviterName: contractor.name,
         inviteLink,
       }),
     });

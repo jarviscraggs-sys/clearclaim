@@ -65,18 +65,10 @@ export async function POST(req: NextRequest) {
       VALUES (?, ?, ?, ?, 'subcontractor', ?)
     `).run(invite.email, passwordHash, name || invite.name, company || invite.company, invite.cis_rate);
 
-    const userId = result.lastInsertRowid;
-
-    // Link subcontractor to contractor in the many-to-many table
-    db.prepare(`
-      INSERT OR IGNORE INTO subcontractor_contractors (subcontractor_id, contractor_id, cis_rate)
-      VALUES (?, ?, ?)
-    `).run(userId, invite.contractor_id, invite.cis_rate || 20);
-
     // Mark invite as used
     db.prepare('UPDATE invites SET used = 1 WHERE id = ?').run(invite.id);
 
-    return NextResponse.json({ success: true, userId });
+    return NextResponse.json({ success: true, userId: result.lastInsertRowid });
   } catch (e: any) {
     console.error('Registration error:', e);
     return NextResponse.json({ error: e.message }, { status: 500 });

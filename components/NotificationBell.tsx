@@ -42,7 +42,9 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
 
   const fetchNotifications = useCallback(async () => {
@@ -74,6 +76,21 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+
+    function handleViewportChange() {
+      setOpen(false);
+    }
+
+    window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('scroll', handleViewportChange, true);
+    return () => {
+      window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('scroll', handleViewportChange, true);
+    };
+  }, [open]);
+
   const markRead = async (id: number) => {
     await fetch(`/api/notifications/${id}/read`, { method: 'POST' });
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: 1 } : n));
@@ -97,7 +114,22 @@ export default function NotificationBell() {
   return (
     <div className="relative" ref={dropdownRef}>
       <button
-        onClick={() => setOpen(!open)}
+        ref={buttonRef}
+        onClick={() => {
+          if (open) {
+            setOpen(false);
+            return;
+          }
+
+          const rect = buttonRef.current?.getBoundingClientRect();
+          if (rect) {
+            setDropdownPos({
+              top: rect.bottom + 8,
+              left: Math.max(8, rect.right - 320),
+            });
+          }
+          setOpen(true);
+        }}
         className="relative p-2 rounded-lg hover:bg-white/10 transition text-white"
         aria-label="Notifications"
       >
@@ -110,7 +142,10 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-[#0a1628] border border-blue-900/40 rounded-2xl shadow-2xl z-50 overflow-hidden">
+        <div
+          className="fixed w-80 bg-[#0a1628] border border-blue-900/40 rounded-2xl shadow-2xl z-50 overflow-hidden"
+          style={{ top: dropdownPos.top, left: dropdownPos.left }}
+        >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-blue-900/30">
             <h3 className="text-white font-semibold text-sm">Notifications</h3>

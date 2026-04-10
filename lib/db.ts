@@ -374,39 +374,6 @@ function initSchema(db: Database.Database) {
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  // Admin invites table
-  db.exec(`CREATE TABLE IF NOT EXISTS admin_invites (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    token TEXT UNIQUE NOT NULL,
-    email TEXT NOT NULL,
-    name TEXT NOT NULL,
-    contractor_id INTEGER NOT NULL,
-    used INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    expires_at TEXT NOT NULL
-  )`);
-
-  // Contractor team table
-  db.exec(`CREATE TABLE IF NOT EXISTS contractor_team (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    contractor_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (contractor_id) REFERENCES users(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  )`);
-
-  // Users table: add parent_contractor_id and is_team_admin if missing
-  const userColsNow = (db.pragma('table_info(users)') as any[]).map((c: any) => c.name);
-  if (!userColsNow.includes('parent_contractor_id')) {
-    db.exec('ALTER TABLE users ADD COLUMN parent_contractor_id INTEGER');
-  }
-  if (!userColsNow.includes('is_team_admin')) {
-    db.exec('ALTER TABLE users ADD COLUMN is_team_admin INTEGER DEFAULT 0');
-  }
-
   // Seed sample projects if none exist
   const projectCount = (db.prepare('SELECT COUNT(*) as c FROM projects').get() as any).c;
   if (projectCount === 0) {

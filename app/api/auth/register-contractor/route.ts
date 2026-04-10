@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import bcrypt from 'bcryptjs';
-import { rateLimit } from '@/lib/rateLimit';
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for') || 'unknown';
-  if (!rateLimit(`register:${ip}`, 10, 60 * 60 * 1000)) {
-    return NextResponse.json({ error: 'Too many requests. Try again later.' }, { status: 429 });
-  }
-
   const body = await req.json();
   const { company, name, email, password } = body;
 

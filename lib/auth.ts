@@ -5,6 +5,18 @@ import { getDb } from './db';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
+  useSecureCookies: process.env.NODE_ENV === 'production',
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === 'production' ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+  },
 
   providers: [
     Credentials({
@@ -25,15 +37,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const valid = await bcrypt.compare(credentials.password as string, user.password_hash);
           if (!valid) return null;
 
-          // If this is a team admin, use the parent contractor's ID for data access
-          const effectiveId = user.parent_contractor_id ? String(user.parent_contractor_id) : String(user.id);
-          const effectiveRole = user.is_team_admin ? 'contractor' : user.role;
-
           return {
-            id: effectiveId,
+            id: String(user.id),
             email: user.email,
             name: user.name,
-            role: effectiveRole,
+            role: user.role,
             company: user.company,
             employeeId: user.employee_id ? String(user.employee_id) : undefined,
           };
