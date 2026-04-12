@@ -374,6 +374,21 @@ function initSchema(db: Database.Database) {
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  // Site photos table
+  db.exec(`CREATE TABLE IF NOT EXISTS site_photos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subcontractor_id INTEGER NOT NULL,
+    contractor_id INTEGER NOT NULL,
+    invoice_id INTEGER,
+    project_id INTEGER,
+    filename TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    caption TEXT,
+    uploaded_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (subcontractor_id) REFERENCES users(id),
+    FOREIGN KEY (contractor_id) REFERENCES users(id)
+  )`);
+
   // Seed sample projects if none exist
   const projectCount = (db.prepare('SELECT COUNT(*) as c FROM projects').get() as any).c;
   if (projectCount === 0) {
