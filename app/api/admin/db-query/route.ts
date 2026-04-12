@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { cookies } from 'next/headers';
 
+function maskEmail(email: string): string {
+  if (email.toLowerCase().endsWith('@getclearclaim.co.uk')) return email;
+  const [local, domain] = email.split('@');
+  if (!local || !domain) return email;
+  const masked = local.length > 2
+    ? local[0] + '*'.repeat(local.length - 2) + local[local.length - 1]
+    : local[0] + '*';
+  return `${masked}@${domain}`;
+}
+
+function maskEmailFields<T extends Record<string, any>>(row: T): T {
+  const masked: Record<string, any> = { ...row };
+  for (const [key, value] of Object.entries(masked)) {
+    if (typeof value === 'string' && key.toLowerCase().includes('email')) {
+      masked[key] = maskEmail(value);
+    }
+  }
+  return masked as T;
+}
+
 export async function GET(req: NextRequest) {
   const cookieStore = await cookies();
   const adminSession = cookieStore.get('admin_session');
@@ -32,5 +52,6 @@ export async function GET(req: NextRequest) {
     rows = db.prepare(`SELECT e.*, u.company as contractor_company FROM employees e LEFT JOIN users u ON u.id = e.contractor_id ORDER BY e.created_at DESC`).all();
   }
 
-  return NextResponse.json({ table, count: (rows as any[]).length, rows });
+  const maskedRows = (rows as Record<string, any>[]).map(maskEmailFields);
+  return NextResponse.json({ table, count: maskedRows.length, rows: maskedRows });
 }

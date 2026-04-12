@@ -216,7 +216,9 @@ export default async function ContractorDashboard() {
             <span className="text-2xl">💷</span>
             <span className="text-xs text-blue-400 bg-blue-500/10 rounded-full px-2 py-0.5">{invoiceCount} total</span>
           </div>
-          <div className="text-3xl font-bold text-blue-400 mb-1">{fmt(totalInvoiced)}</div>
+          <Link href="/contractor/vat-report" className="inline-block text-3xl font-bold text-blue-400 mb-1 hover:text-blue-300 transition">
+            {fmt(totalInvoiced)}
+          </Link>
           <div className="text-sm text-blue-300/60">Total Invoiced (all time)</div>
           {monthStats.month_invoiced > 0 && (
             <div className="text-xs text-blue-400 mt-2">
