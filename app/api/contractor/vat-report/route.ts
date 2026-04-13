@@ -10,7 +10,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const user = session.user as { role?: string };
+  const user = session.user as { id?: number; role?: string };
   if (user.role !== 'contractor') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -26,12 +26,13 @@ export async function GET() {
         COALESCE(SUM(vat_amount), 0) AS vat_charged,
         COALESCE(SUM(amount + vat_amount), 0) AS total_inc_vat
       FROM invoices
-      WHERE status = 'approved' OR COALESCE(paid, 0) = 1
+      WHERE contractor_id = ?
+        AND (status = 'approved' OR COALESCE(paid, 0) = 1)
       GROUP BY month
       ORDER BY month DESC
     `
     )
-    .all() as Array<{
+    .all(user.id) as Array<{
     month: string;
     sales_ex_vat: number;
     vat_charged: number;
@@ -43,12 +44,13 @@ export async function GET() {
       `
       SELECT COALESCE(SUM(amount), 0) AS rolling_12_month_sales
       FROM invoices
-      WHERE (status = 'approved' OR COALESCE(paid, 0) = 1)
+      WHERE contractor_id = ?
+        AND (status = 'approved' OR COALESCE(paid, 0) = 1)
         AND date(COALESCE(reviewed_at, submitted_at)) >= date('now', 'start of month', '-11 months')
         AND date(COALESCE(reviewed_at, submitted_at)) <= date('now', 'start of month', '+1 month', '-1 day')
     `
     )
-    .get() as { rolling_12_month_sales: number };
+    .get(user.id) as { rolling_12_month_sales: number };
 
   return NextResponse.json({
     months: monthly,
