@@ -31,8 +31,6 @@ export default async function ContractorDashboard() {
   const user = session!.user as any;
   const db = getDb();
 
-  const contractorId = Number(user.id);
-
   // 1. Key financial totals
   const totals = db.prepare(`
     SELECT 
@@ -47,8 +45,8 @@ export default async function ContractorDashboard() {
       SUM(CASE WHEN status='approved' THEN 1 ELSE 0 END) as approved_count,
       SUM(CASE WHEN status='queried' THEN 1 ELSE 0 END) as queried_count,
       SUM(CASE WHEN status='rejected' THEN 1 ELSE 0 END) as rejected_count
-    FROM invoices WHERE contractor_id = ?
-  `).get(contractorId) as any;
+    FROM invoices
+  `).get() as any;
 
   // 2. This month's stats
   const monthStats = db.prepare(`
@@ -56,8 +54,8 @@ export default async function ContractorDashboard() {
       COALESCE(SUM(amount), 0) as month_invoiced,
       COALESCE(SUM(CASE WHEN status='approved' THEN amount ELSE 0 END), 0) as month_approved,
       COUNT(*) as month_count
-    FROM invoices WHERE contractor_id = ? AND strftime('%Y-%m', submitted_at) = strftime('%Y-%m', 'now')
-  `).get(contractorId) as any;
+    FROM invoices WHERE strftime('%Y-%m', submitted_at) = strftime('%Y-%m', 'now')
+  `).get() as any;
 
   // 3. Monthly trend (last 6 months)
   const monthlyTrend = db.prepare(`
@@ -66,9 +64,9 @@ export default async function ContractorDashboard() {
       SUM(amount) as total,
       SUM(CASE WHEN status='approved' THEN amount ELSE 0 END) as approved
     FROM invoices
-    WHERE contractor_id = ? AND submitted_at >= date('now', '-6 months')
+    WHERE submitted_at >= date('now', '-6 months')
     GROUP BY month ORDER BY month ASC
-  `).all(contractorId) as any[];
+  `).all() as any[];
 
   // 4. Top subcontractors by value
   const topSubs = db.prepare(`
@@ -76,44 +74,42 @@ export default async function ContractorDashboard() {
       SUM(i.amount) as total_value,
       SUM(CASE WHEN i.status='approved' THEN i.amount ELSE 0 END) as approved_value
     FROM invoices i JOIN users u ON i.subcontractor_id = u.id
-    WHERE i.contractor_id = ?
     GROUP BY u.id ORDER BY total_value DESC LIMIT 5
-  `).all(contractorId) as any[];
+  `).all() as any[];
 
   // 5. AI flags count this month
   const aiFlags = db.prepare(`
-    SELECT COUNT(DISTINCT af.invoice_id) as flagged
-    FROM ai_flags af JOIN invoices i ON i.id = af.invoice_id
-    WHERE i.contractor_id = ? AND af.created_at >= date('now', '-30 days')
-  `).get(contractorId) as any;
+    SELECT COUNT(DISTINCT invoice_id) as flagged
+    FROM ai_flags WHERE created_at >= date('now', '-30 days')
+  `).get() as any;
 
   // 6. Employee stats
   const empStats = db.prepare(`
     SELECT COUNT(*) as total_employees,
-      (SELECT COUNT(*) FROM timesheets WHERE status='pending' AND contractor_id = $cid) as pending_timesheets,
-      (SELECT COUNT(*) FROM holiday_requests WHERE status='pending' AND contractor_id = $cid) as pending_holidays
-    FROM employees WHERE status='active' AND contractor_id = $cid
-  `).get({ cid: contractorId }) as any;
+      (SELECT COUNT(*) FROM timesheets WHERE status='pending') as pending_timesheets,
+      (SELECT COUNT(*) FROM holiday_requests WHERE status='pending') as pending_holidays
+    FROM employees WHERE status='active'
+  `).get() as any;
 
   // 7. Compliance alerts
   const compliance = db.prepare(`
     SELECT COUNT(*) as expiring_compliance
     FROM subcontractor_compliance
-    WHERE contractor_id = ? AND status IN ('expiring_soon', 'expired')
-  `).get(contractorId) as any;
+    WHERE status IN ('expiring_soon', 'expired')
+  `).get() as any;
 
   // 8. Projects summary
   const projects = db.prepare(`
     SELECT COUNT(*) as total_projects,
       COALESCE(SUM(contract_value), 0) as total_contract_value
-    FROM projects WHERE contractor_id = ? AND status='active'
-  `).get(contractorId) as any;
+    FROM projects WHERE status='active'
+  `).get() as any;
 
   // 9. Outstanding payments (approved, unpaid)
   const outstanding = db.prepare(`
     SELECT COALESCE(SUM(amount - cis_amount - retention_amount), 0) as outstanding_net
-    FROM invoices WHERE contractor_id = ? AND status='approved' AND COALESCE(paid, 0) = 0
-  `).get(contractorId) as any;
+    FROM invoices WHERE status='approved' AND COALESCE(paid, 0) = 0
+  `).get() as any;
 
   // 10. Unread notifications
   const notifications = db.prepare(`
@@ -126,9 +122,8 @@ export default async function ContractorDashboard() {
     (SELECT COUNT(*) FROM ai_flags WHERE invoice_id = i.id) as flag_count,
     (SELECT MAX(confidence_score) FROM ai_flags WHERE invoice_id = i.id) as max_flag_score
     FROM invoices i JOIN users u ON i.subcontractor_id = u.id
-    WHERE i.contractor_id = ?
     ORDER BY i.submitted_at DESC LIMIT 8
-  `).all(contractorId) as any[];
+  `).all() as any[];
 
   // Computed values
   const now = new Date();
