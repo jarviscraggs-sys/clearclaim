@@ -1,19 +1,16 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-function LoginContent() {
+export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const verified = searchParams.get('verified');
-  const registered = searchParams.get('registered');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +29,6 @@ function LoginContent() {
       return;
     }
 
-    // Fetch session to determine role
     const res = await fetch('/api/auth/session');
     const session = await res.json();
     const role = session?.user?.role;
@@ -46,18 +42,6 @@ function LoginContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-800 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Status banners */}
-        {verified === 'true' && (
-          <div className="mb-4 p-4 bg-green-900/40 border border-green-600 rounded-xl text-green-300 text-sm text-center">
-            ✅ Email verified successfully! You can now log in.
-          </div>
-        )}
-        {registered === 'contractor' && (
-          <div className="mb-4 p-4 bg-blue-900/40 border border-blue-600 rounded-xl text-blue-300 text-sm text-center">
-            📧 Account created! Please check your email to verify your account before logging in.
-          </div>
-        )}
-        {/* Logo / Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-500 rounded-2xl mb-4 shadow-lg shadow-blue-500/25">
             <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -68,7 +52,6 @@ function LoginContent() {
           <p className="text-blue-300 mt-1 text-sm">Construction Invoice Management</p>
         </div>
 
-        {/* Login Card */}
         <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-8 shadow-2xl">
           <h2 className="text-xl font-semibold text-white mb-6">Sign in to your account</h2>
 
@@ -118,29 +101,19 @@ function LoginContent() {
           </form>
         </div>
 
-        {/* Contractor registration */}
         <div className="mt-4 text-center">
           <Link href="/register/contractor" className="text-sm text-blue-300 hover:text-blue-200 transition">
             New contractor? Register your company →
           </Link>
         </div>
 
-        {/* Demo credentials */}
         <div className="mt-6 bg-white/5 border border-white/10 rounded-xl p-4 text-xs text-blue-300">
           <p className="font-semibold text-blue-200 mb-2">Demo credentials:</p>
-          <p>Contractor: <span className="text-white">contractor@clearclaim.co.uk / demo123</span></p>
-          <p>Subcontractor: <span className="text-white">sub1@clearclaim.co.uk / demo123</span></p>
-          <p>Employee: <span className="text-white">emp1@clearclaim.co.uk / demo123</span></p>
+          <p>Contractor: <span className="text-white">contractor@getclearclaim.co.uk / demo123</span></p>
+          <p>Subcontractor: <span className="text-white">sub1@getclearclaim.co.uk / demo123</span></p>
+          <p>Employee: <span className="text-white">emp1@getclearclaim.co.uk / demo123</span></p>
         </div>
       </div>
     </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center"><p className="text-white">Loading...</p></div>}>
-      <LoginContent />
-    </Suspense>
   );
 }
