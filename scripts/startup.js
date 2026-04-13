@@ -3,7 +3,7 @@ const path = require('path');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 
-const DB_PATH = path.join(process.cwd(), 'clearclaim.db');
+const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'clearclaim.db');
 console.log('[ClearClaim] Startup — DB path:', DB_PATH);
 
 try {
