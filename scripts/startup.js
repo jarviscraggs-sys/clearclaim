@@ -434,14 +434,14 @@ try {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
-    insertNotif.run(contractorId, 'invoice', 'New Invoice Submitted', 'Smith Electrical Ltd has submitted invoice INV-2024-003 for £2,400 + VAT.', '/invoices', 0, '2024-03-11 08:46:00');
-    insertNotif.run(contractorId, 'invoice', 'Invoice Queried', 'You have raised a query on invoice INV-2024-004 from Smith Electrical Ltd.', '/invoices', 1, '2024-03-20 16:01:00');
-    insertNotif.run(contractorId, 'invoice', 'New Invoice Submitted', 'Jones Groundworks has submitted invoice INV-GW-002 for £2,800 + VAT.', '/invoices', 0, '2024-03-04 07:31:00');
-    insertNotif.run(contractorId, 'holiday', 'Holiday Request Received', 'Mike Johnson has requested 5 days annual leave (15–19 Apr 2024).', '/employees', 0, '2024-03-20 09:01:00');
-    insertNotif.run(contractorId, 'holiday', 'Holiday Request Received', 'Sarah Williams has requested 5 days annual leave (6–10 May 2024).', '/employees', 0, '2024-03-18 11:01:00');
-    insertNotif.run(contractorId, 'holiday', 'Holiday Request Received', 'Tom Roberts has requested 5 days annual leave (3–7 Jun 2024).', '/employees', 0, '2024-03-19 09:31:00');
-    insertNotif.run(contractorId, 'timesheet', 'Timesheets Ready for Review', '3 timesheets submitted for week starting 18 Mar 2024 — awaiting review.', '/timesheets', 0, '2024-03-22 18:01:00');
-    insertNotif.run(contractorId, 'compliance', 'Compliance Reminder', 'Smith Electrical Ltd public liability insurance expires in 30 days.', '/subcontractors', 0, '2024-03-15 08:00:00');
+    insertNotif.run(contractorId, 'invoice', 'New Invoice Submitted', 'Smith Electrical Ltd has submitted invoice INV-2024-003 for £2,400 + VAT.', '/contractor/invoices', 0, '2024-03-11 08:46:00');
+    insertNotif.run(contractorId, 'invoice', 'Invoice Queried', 'You have raised a query on invoice INV-2024-004 from Smith Electrical Ltd.', '/contractor/invoices', 1, '2024-03-20 16:01:00');
+    insertNotif.run(contractorId, 'invoice', 'New Invoice Submitted', 'Jones Groundworks has submitted invoice INV-GW-002 for £2,800 + VAT.', '/contractor/invoices', 0, '2024-03-04 07:31:00');
+    insertNotif.run(contractorId, 'holiday', 'Holiday Request Received', 'Mike Johnson has requested 5 days annual leave (15–19 Apr 2024).', '/contractor/holidays', 0, '2024-03-20 09:01:00');
+    insertNotif.run(contractorId, 'holiday', 'Holiday Request Received', 'Sarah Williams has requested 5 days annual leave (6–10 May 2024).', '/contractor/holidays', 0, '2024-03-18 11:01:00');
+    insertNotif.run(contractorId, 'holiday', 'Holiday Request Received', 'Tom Roberts has requested 5 days annual leave (3–7 Jun 2024).', '/contractor/holidays', 0, '2024-03-19 09:31:00');
+    insertNotif.run(contractorId, 'timesheet', 'Timesheets Ready for Review', '3 timesheets submitted for week starting 18 Mar 2024 — awaiting review.', '/contractor/timesheets', 0, '2024-03-22 18:01:00');
+    insertNotif.run(contractorId, 'compliance', 'Compliance Reminder', 'Smith Electrical Ltd public liability insurance expires in 30 days.', '/contractor/subcontractors', 0, '2024-03-15 08:00:00');
 
     console.log('[ClearClaim] Rich demo data seeded successfully.');
     console.log('[ClearClaim] Logins: contractor@getclearclaim.co.uk / demo123');

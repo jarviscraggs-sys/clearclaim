@@ -103,10 +103,25 @@ export default function NotificationBell() {
     setUnreadCount(0);
   };
 
+  const resolveLink = (link: string): string => {
+    // Fix legacy short links that are missing the portal prefix
+    const shortPaths = ['/invoices', '/timesheets', '/employees', '/subcontractors', '/holidays', '/projects', '/compliance', '/disputes', '/variations'];
+    for (const short of shortPaths) {
+      if (link === short || link.startsWith(short + '/')) {
+        // Determine portal from current pathname
+        const path = window.location.pathname;
+        if (path.startsWith('/contractor')) return '/contractor' + link;
+        if (path.startsWith('/subcontractor')) return '/subcontractor' + link;
+        if (path.startsWith('/employee')) return '/employee' + link;
+      }
+    }
+    return link;
+  };
+
   const handleNotificationClick = async (n: Notification) => {
     if (!n.read) await markRead(n.id);
     setOpen(false);
-    if (n.link) router.push(n.link);
+    if (n.link) router.push(resolveLink(n.link));
   };
 
   const displayed = notifications.slice(0, 10);
