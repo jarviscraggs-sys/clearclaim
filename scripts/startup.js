@@ -341,9 +341,15 @@ try {
       `INSERT INTO users (email, password_hash, name, company, role) VALUES (?, ?, ?, ?, ?)`
     ).run('sub2@getclearclaim.co.uk', hash, 'Tom Jones', 'Jones Groundworks', 'subcontractor').lastInsertRowid;
 
-    db.prepare(
+    const sub3Id = db.prepare(
       `INSERT INTO users (email, password_hash, name, company, role) VALUES (?, ?, ?, ?, ?)`
-    ).run('sub3@getclearclaim.co.uk', hash, 'Pete Sykes', 'Peak Plumbing Services', 'subcontractor');
+    ).run('sub3@getclearclaim.co.uk', hash, 'Pete Sykes', 'Peak Plumbing Services', 'subcontractor').lastInsertRowid;
+
+    // --- Link demo subs to demo contractor ---
+    const linkSub = db.prepare(`INSERT OR IGNORE INTO subcontractor_contractors (subcontractor_id, contractor_id, cis_rate) VALUES (?, ?, ?)`);
+    linkSub.run(sub1Id, contractorId, 20);
+    linkSub.run(sub2Id, contractorId, 20);
+    linkSub.run(sub3Id, contractorId, 20);
 
     // --- Employee users ---
     const emp1UserId = db.prepare(
