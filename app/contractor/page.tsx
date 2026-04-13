@@ -90,10 +90,10 @@ export default async function ContractorDashboard() {
   // 6. Employee stats
   const empStats = db.prepare(`
     SELECT COUNT(*) as total_employees,
-      (SELECT COUNT(*) FROM timesheets WHERE status='pending' AND contractor_id = ?) as pending_timesheets,
-      (SELECT COUNT(*) FROM holiday_requests WHERE status='pending' AND contractor_id = ?) as pending_holidays
-    FROM employees WHERE status='active' AND contractor_id = ?
-  `).get(contractorId, contractorId, contractorId) as any;
+      (SELECT COUNT(*) FROM timesheets WHERE status='pending' AND contractor_id = $cid) as pending_timesheets,
+      (SELECT COUNT(*) FROM holiday_requests WHERE status='pending' AND contractor_id = $cid) as pending_holidays
+    FROM employees WHERE status='active' AND contractor_id = $cid
+  `).get({ cid: contractorId }) as any;
 
   // 7. Compliance alerts
   const compliance = db.prepare(`
