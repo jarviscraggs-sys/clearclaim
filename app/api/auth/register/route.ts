@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   const db = getDb();
   const invite = db.prepare(`
-    SELECT * FROM invites WHERE token = ? AND used = 0 AND expires_at > datetime('now')
+    SELECT * FROM invites WHERE token = ? AND used = 0 AND expires_at > datetime('now') OR expires_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
   `).get(token) as any;
 
   if (!invite) {
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     }
 
     const invite = db.prepare(`
-      SELECT * FROM invites WHERE token = ? AND used = 0 AND expires_at > datetime('now')
+      SELECT * FROM invites WHERE token = ? AND used = 0 AND expires_at > datetime('now') OR expires_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
     `).get(token) as any;
 
     if (!invite) {
