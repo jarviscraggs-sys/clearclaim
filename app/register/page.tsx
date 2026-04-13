@@ -21,6 +21,7 @@ function RegisterContent() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ password: '', confirmPassword: '' });
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -125,25 +126,31 @@ function RegisterContent() {
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={form.password}
                 onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                 className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Min. 8 characters"
                 required
                 minLength={8}
+                autoComplete="new-password"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Confirm Password</label>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={form.confirmPassword}
                 onChange={e => setForm(f => ({ ...f, confirmPassword: e.target.value }))}
                 className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Repeat password"
                 required
+                autoComplete="new-password"
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="showpw" checked={showPassword} onChange={e => setShowPassword(e.target.checked)} className="w-4 h-4" />
+              <label htmlFor="showpw" className="text-sm text-slate-400 cursor-pointer">Show passwords</label>
             </div>
 
             {error && (
