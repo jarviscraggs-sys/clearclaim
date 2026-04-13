@@ -301,6 +301,21 @@ try {
   // Migrations
   try { db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0"); } catch(e) { /* already exists */ }
 
+  // Backfill subcontractor_contractors from invoices (links subs to contractors based on invoice data)
+  try {
+    const invoiceLinks = db.prepare(`
+      SELECT DISTINCT i.subcontractor_id, i.contractor_id
+      FROM invoices i
+      WHERE i.contractor_id IS NOT NULL
+    `).all();
+    for (const link of invoiceLinks) {
+      try {
+        db.prepare(`INSERT OR IGNORE INTO subcontractor_contractors (subcontractor_id, contractor_id, cis_rate) VALUES (?, ?, 20)`)
+          .run(link.subcontractor_id, link.contractor_id);
+      } catch(e) {}
+    }
+  } catch(e) {}
+
   // Backfill subcontractor_contractors from used invites (ensures all accepted invites are linked)
   try {
     const usedInvites = db.prepare(`
