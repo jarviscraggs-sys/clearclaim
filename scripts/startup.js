@@ -330,18 +330,17 @@ try {
       } catch(e) {}
     }
 
-    // Third: if there's only one contractor and subs with no contractor_id on invoices, link them
-    const contractors = db.prepare(`SELECT id FROM users WHERE role = 'contractor'`).all();
-    if (contractors.length === 1) {
-      const theContractor = contractors[0].id;
-      // Update any invoices with NULL contractor_id to point to the only contractor
-      db.prepare(`UPDATE invoices SET contractor_id = ? WHERE contractor_id IS NULL`).run(theContractor);
-      // Link all subs to this contractor
-      const subs = db.prepare(`SELECT id FROM users WHERE role = 'subcontractor'`).all();
-      for (const sub of subs) {
+    // Third: link demo subs to demo contractor
+    const demoContractor = db.prepare(`SELECT id FROM users WHERE email = 'contractor@getclearclaim.co.uk'`).get();
+    if (demoContractor) {
+      const demoSubs = db.prepare(`SELECT id FROM users WHERE email LIKE '%@getclearclaim.co.uk' AND role = 'subcontractor'`).all();
+      for (const sub of demoSubs) {
         try {
           db.prepare(`INSERT OR IGNORE INTO subcontractor_contractors (subcontractor_id, contractor_id, cis_rate) VALUES (?, ?, 20)`)
-            .run(sub.id, theContractor);
+            .run(sub.id, demoContractor.id);
+          // Also update invoices to have contractor_id
+          db.prepare(`UPDATE invoices SET contractor_id = ? WHERE subcontractor_id = ? AND contractor_id IS NULL`)
+            .run(demoContractor.id, sub.id);
         } catch(e) {}
       }
     }
