@@ -33,8 +33,13 @@ export default async function ContractorDashboard() {
 
   const cid = Number(user.id);
 
+  // Get this contractor's linked subcontractor IDs
+  const linkedSubIds = (db.prepare(`SELECT subcontractor_id FROM subcontractor_contractors WHERE contractor_id = ?`).all(cid) as any[]).map((r: any) => r.subcontractor_id);
+  const hasLinkedSubs = linkedSubIds.length > 0;
+  const subIdList = hasLinkedSubs ? linkedSubIds.join(',') : '0';
+
   // 1. Key financial totals — scoped to this contractor's linked subcontractors
-  const totals = db.prepare(`
+  const totals = hasLinkedSubs ? db.prepare(`
     SELECT 
       COALESCE(SUM(i.amount), 0) as total_invoiced,
       COALESCE(SUM(CASE WHEN i.status='approved' THEN i.amount ELSE 0 END), 0) as total_approved,
@@ -48,51 +53,51 @@ export default async function ContractorDashboard() {
       SUM(CASE WHEN i.status='queried' THEN 1 ELSE 0 END) as queried_count,
       SUM(CASE WHEN i.status='rejected' THEN 1 ELSE 0 END) as rejected_count
     FROM invoices i
-    JOIN subcontractor_contractors sc ON sc.subcontractor_id = i.subcontractor_id AND sc.contractor_id = ?
-  `).get(cid) as any;
+    WHERE i.subcontractor_id IN (${subIdList})
+  `).get() as any : { total_invoiced: 0, total_approved: 0, total_pending: 0, total_queried: 0, total_cis: 0, total_retention: 0, invoice_count: 0, pending_count: 0, approved_count: 0, queried_count: 0, rejected_count: 0 };
 
   // 2. This month's stats
-  const monthStats = db.prepare(`
+  const monthStats = hasLinkedSubs ? db.prepare(`
     SELECT 
       COALESCE(SUM(i.amount), 0) as month_invoiced,
       COALESCE(SUM(CASE WHEN i.status='approved' THEN i.amount ELSE 0 END), 0) as month_approved,
       COUNT(*) as month_count
     FROM invoices i
-    JOIN subcontractor_contractors sc ON sc.subcontractor_id = i.subcontractor_id AND sc.contractor_id = ?
-    WHERE strftime('%Y-%m', i.submitted_at) = strftime('%Y-%m', 'now')
-  `).get(cid) as any;
+    WHERE i.subcontractor_id IN (${subIdList})
+    AND strftime('%Y-%m', i.submitted_at) = strftime('%Y-%m', 'now')
+  `).get() as any : { month_invoiced: 0, month_approved: 0, month_count: 0 };
 
   // 3. Monthly trend (last 6 months)
-  const monthlyTrend = db.prepare(`
+  const monthlyTrend = hasLinkedSubs ? db.prepare(`
     SELECT strftime('%Y-%m', i.submitted_at) as month,
       COUNT(*) as count,
       SUM(i.amount) as total,
       SUM(CASE WHEN i.status='approved' THEN i.amount ELSE 0 END) as approved
     FROM invoices i
-    JOIN subcontractor_contractors sc ON sc.subcontractor_id = i.subcontractor_id AND sc.contractor_id = ?
-    WHERE i.submitted_at >= date('now', '-6 months')
+    WHERE i.subcontractor_id IN (${subIdList})
+    AND i.submitted_at >= date('now', '-6 months')
     GROUP BY month ORDER BY month ASC
-  `).all(cid) as any[];
+  `).all() : [] as any[];
 
   // 4. Top subcontractors by value
-  const topSubs = db.prepare(`
+  const topSubs = hasLinkedSubs ? db.prepare(`
     SELECT u.name, u.company, COUNT(*) as invoice_count,
       SUM(i.amount) as total_value,
       SUM(CASE WHEN i.status='approved' THEN i.amount ELSE 0 END) as approved_value
     FROM invoices i
     JOIN users u ON i.subcontractor_id = u.id
-    JOIN subcontractor_contractors sc ON sc.subcontractor_id = i.subcontractor_id AND sc.contractor_id = ?
+    WHERE i.subcontractor_id IN (${subIdList})
     GROUP BY u.id ORDER BY total_value DESC LIMIT 5
-  `).all(cid) as any[];
+  `).all() : [] as any[];
 
   // 5. AI flags count this month
-  const aiFlags = db.prepare(`
+  const aiFlags = hasLinkedSubs ? db.prepare(`
     SELECT COUNT(DISTINCT af.invoice_id) as flagged
     FROM ai_flags af
     JOIN invoices i ON i.id = af.invoice_id
-    JOIN subcontractor_contractors sc ON sc.subcontractor_id = i.subcontractor_id AND sc.contractor_id = ?
-    WHERE af.created_at >= date('now', '-30 days')
-  `).get(cid) as any;
+    WHERE i.subcontractor_id IN (${subIdList})
+    AND af.created_at >= date('now', '-30 days')
+  `).get() as any : { flagged: 0 };
 
   // 6. Employee stats — scoped to this contractor
   const empStats = db.prepare(`
@@ -117,12 +122,12 @@ export default async function ContractorDashboard() {
   `).get(cid) as any;
 
   // 9. Outstanding payments (approved, unpaid)
-  const outstanding = db.prepare(`
+  const outstanding = hasLinkedSubs ? db.prepare(`
     SELECT COALESCE(SUM(i.amount - i.cis_amount - i.retention_amount), 0) as outstanding_net
     FROM invoices i
-    JOIN subcontractor_contractors sc ON sc.subcontractor_id = i.subcontractor_id AND sc.contractor_id = ?
-    WHERE i.status='approved' AND COALESCE(i.paid, 0) = 0
-  `).get(cid) as any;
+    WHERE i.subcontractor_id IN (${subIdList})
+    AND i.status='approved' AND COALESCE(i.paid, 0) = 0
+  `).get() as any : { outstanding_net: 0 };
 
   // 10. Unread notifications
   const notifications = db.prepare(`
@@ -130,15 +135,15 @@ export default async function ContractorDashboard() {
   `).get(user.id) as any;
 
   // 11. Recent invoices
-  const recentInvoices = db.prepare(`
+  const recentInvoices = hasLinkedSubs ? db.prepare(`
     SELECT i.*, u.name as subcontractor_name, u.company as subcontractor_company,
     (SELECT COUNT(*) FROM ai_flags WHERE invoice_id = i.id) as flag_count,
     (SELECT MAX(confidence_score) FROM ai_flags WHERE invoice_id = i.id) as max_flag_score
     FROM invoices i
     JOIN users u ON i.subcontractor_id = u.id
-    JOIN subcontractor_contractors sc ON sc.subcontractor_id = i.subcontractor_id AND sc.contractor_id = ?
+    WHERE i.subcontractor_id IN (${subIdList})
     ORDER BY i.submitted_at DESC LIMIT 8
-  `).all(cid) as any[];
+  `).all() : [] as any[];
 
   // Computed values
   const now = new Date();
