@@ -301,8 +301,23 @@ try {
   // Migrations
   try { db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0"); } catch(e) { /* already exists */ }
 
-  // Backfill subcontractor_contractors from invoices (links subs to contractors based on invoice data)
+  // For each subcontractor, find their contractor via invites and ensure link exists
   try {
+    // First: for all subcontractors who accepted invites, ensure sc link exists
+    const inviteLinks = db.prepare(`
+      SELECT DISTINCT inv.contractor_id, u.id as sub_id, inv.cis_rate
+      FROM invites inv
+      JOIN users u ON u.email = inv.email AND u.role = 'subcontractor'
+      WHERE inv.used = 1
+    `).all();
+    for (const link of inviteLinks) {
+      try {
+        db.prepare(`INSERT OR IGNORE INTO subcontractor_contractors (subcontractor_id, contractor_id, cis_rate) VALUES (?, ?, ?)`)
+          .run(link.sub_id, link.contractor_id, link.cis_rate || 20);
+      } catch(e) {}
+    }
+
+    // Second: for each contractor, link all their subs (those whose invoices have contractor_id set)
     const invoiceLinks = db.prepare(`
       SELECT DISTINCT i.subcontractor_id, i.contractor_id
       FROM invoices i
@@ -314,7 +329,23 @@ try {
           .run(link.subcontractor_id, link.contractor_id);
       } catch(e) {}
     }
-  } catch(e) {}
+
+    // Third: if there's only one contractor and subs with no contractor_id on invoices, link them
+    const contractors = db.prepare(`SELECT id FROM users WHERE role = 'contractor'`).all();
+    if (contractors.length === 1) {
+      const theContractor = contractors[0].id;
+      // Update any invoices with NULL contractor_id to point to the only contractor
+      db.prepare(`UPDATE invoices SET contractor_id = ? WHERE contractor_id IS NULL`).run(theContractor);
+      // Link all subs to this contractor
+      const subs = db.prepare(`SELECT id FROM users WHERE role = 'subcontractor'`).all();
+      for (const sub of subs) {
+        try {
+          db.prepare(`INSERT OR IGNORE INTO subcontractor_contractors (subcontractor_id, contractor_id, cis_rate) VALUES (?, ?, 20)`)
+            .run(sub.id, theContractor);
+        } catch(e) {}
+      }
+    }
+  } catch(e) { console.error('[ClearClaim] Sub-link migration error:', e.message); }
 
   // Backfill subcontractor_contractors from used invites (ensures all accepted invites are linked)
   try {
