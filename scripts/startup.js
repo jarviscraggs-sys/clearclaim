@@ -300,6 +300,25 @@ try {
 
   // Migrations
   try { db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0"); } catch(e) { /* already exists */ }
+
+  // Backfill subcontractor_contractors from used invites (ensures all accepted invites are linked)
+  try {
+    const usedInvites = db.prepare(`
+      SELECT inv.contractor_id, u.id as sub_id, inv.cis_rate
+      FROM invites inv
+      JOIN users u ON u.email = inv.email
+      WHERE inv.used = 1
+    `).all();
+    for (const inv of usedInvites) {
+      try {
+        db.prepare(`INSERT OR IGNORE INTO subcontractor_contractors (subcontractor_id, contractor_id, cis_rate) VALUES (?, ?, ?)`)
+          .run(inv.sub_id, inv.contractor_id, inv.cis_rate || 20);
+      } catch(e) {}
+    }
+    if (usedInvites.length > 0) {
+      console.log(`[ClearClaim] Migration: ensured ${usedInvites.length} sub-contractor link(s).`);
+    }
+  } catch(e) { console.error('[ClearClaim] Sub-contractor link migration error:', e.message); }
   // Seed demo accounts if no users exist
   const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
   console.log('[ClearClaim] Users in DB:', userCount.c);
