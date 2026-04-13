@@ -31,7 +31,7 @@ function RegisterContent() {
     }
 
     // Validate invite token
-    fetch(`/api/invites?token=${token}`)
+    fetch(`/api/auth/register?token=${token}`)
       .then(r => r.json())
       .then(data => {
         if (data.error) {
