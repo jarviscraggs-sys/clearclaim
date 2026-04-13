@@ -101,7 +101,19 @@ function initSchema(db: Database.Database) {
       expires_at TEXT NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS email_verifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      token TEXT UNIQUE NOT NULL,
+      used INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
   `);
+
+  // Migrations
+  try { db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0'); } catch(e) { /* already exists */ }
 
   // Audit log table
   db.exec(`CREATE TABLE IF NOT EXISTS audit_log (

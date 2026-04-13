@@ -131,6 +131,15 @@ try {
       created_at TEXT DEFAULT (datetime('now')),
       expires_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS email_verifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      token TEXT UNIQUE NOT NULL,
+      used INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
     CREATE TABLE IF NOT EXISTS employees (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       contractor_id INTEGER NOT NULL,
@@ -288,6 +297,9 @@ try {
     );
   `);
 
+
+  // Migrations
+  try { db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0"); } catch(e) { /* already exists */ }
   // Seed demo accounts if no users exist
   const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
   console.log('[ClearClaim] Users in DB:', userCount.c);
@@ -443,6 +455,8 @@ try {
     insertNotif.run(contractorId, 'timesheet', 'Timesheets Ready for Review', '3 timesheets submitted for week starting 18 Mar 2024 — awaiting review.', '/contractor/timesheets', 0, '2024-03-22 18:01:00');
     insertNotif.run(contractorId, 'compliance', 'Compliance Reminder', 'Smith Electrical Ltd public liability insurance expires in 30 days.', '/contractor/subcontractors', 0, '2024-03-15 08:00:00');
 
+    // Mark all demo accounts as email verified
+    db.prepare("UPDATE users SET email_verified = 1 WHERE email LIKE '%@getclearclaim.co.uk'").run();
     console.log('[ClearClaim] Rich demo data seeded successfully.');
     console.log('[ClearClaim] Logins: contractor@getclearclaim.co.uk / demo123');
     console.log('[ClearClaim]         sub1/sub2/sub3@getclearclaim.co.uk / demo123');
