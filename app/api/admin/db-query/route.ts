@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const table = searchParams.get('table') || 'users';
 
-  const allowedTables = ['users', 'invoices', 'projects', 'invites', 'employees'];
+  const allowedTables = ['users', 'invoices', 'projects', 'invites', 'employees', 'subcontractor_contractors'];
   if (!allowedTables.includes(table)) {
     return NextResponse.json({ error: 'Table not allowed' }, { status: 400 });
   }
@@ -43,13 +43,15 @@ export async function GET(req: NextRequest) {
   if (table === 'users') {
     rows = db.prepare(`SELECT id, name, company, email, role, created_at FROM users ORDER BY created_at DESC`).all();
   } else if (table === 'invoices') {
-    rows = db.prepare(`SELECT i.id, i.invoice_number, i.description, i.amount, i.status, i.submitted_at, u.name as subcontractor_name, u.company FROM invoices i LEFT JOIN users u ON u.id = i.subcontractor_id ORDER BY i.submitted_at DESC`).all();
+    rows = db.prepare(`SELECT i.id, i.invoice_number, i.contractor_id, i.subcontractor_id, i.amount, i.status, i.submitted_at, u.name as subcontractor_name, u.company FROM invoices i LEFT JOIN users u ON u.id = i.subcontractor_id ORDER BY i.submitted_at DESC`).all();
   } else if (table === 'projects') {
     rows = db.prepare(`SELECT p.*, u.company as contractor_company FROM projects p LEFT JOIN users u ON u.id = p.contractor_id ORDER BY p.created_at DESC`).all();
   } else if (table === 'invites') {
     rows = db.prepare(`SELECT i.*, u.company as contractor_company FROM invites i LEFT JOIN users u ON u.id = i.contractor_id ORDER BY i.created_at DESC`).all();
   } else if (table === 'employees') {
     rows = db.prepare(`SELECT e.*, u.company as contractor_company FROM employees e LEFT JOIN users u ON u.id = e.contractor_id ORDER BY e.created_at DESC`).all();
+  } else if (table === 'subcontractor_contractors') {
+    rows = db.prepare(`SELECT sc.*, s.name as sub_name, s.company as sub_company, c.name as contractor_name, c.company as contractor_company FROM subcontractor_contractors sc JOIN users s ON s.id = sc.subcontractor_id JOIN users c ON c.id = sc.contractor_id`).all();
   }
 
   const maskedRows = (rows as Record<string, any>[]).map(maskEmailFields);
